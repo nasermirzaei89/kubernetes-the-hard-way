@@ -7,7 +7,7 @@ but you can use any cloud provider or your own infrastructure.
 
 * [Installing the Client Tools](./client-tools.md)
 * [Provisioning Infrastructure](./infrastructure.md)
-* Provisioning Certificate Authorities
+* [Provisioning Certificate Authorities](./certificate-authorities.md)
 * Bootstrapping the etcd Cluster
 * Bootstrapping the Kubernetes Control Planes
 * Bootstrapping the Kubernetes Workers
