@@ -9,8 +9,8 @@ but you can use any cloud provider or your own infrastructure.
 * [Provisioning Infrastructure](./infrastructure.md)
 * [Provisioning Certificate Authorities](./certificate-authorities.md)
 * [Bootstrapping the etcd Cluster](./etcd.md)
-* Bootstrapping the Kubernetes Control Planes
-* Bootstrapping the Kubernetes Workers
+* [Bootstrapping the Kubernetes Control Planes](./control-planes.md)
+* [Bootstrapping the Kubernetes Workers](./workers.md)
 * Installing Container Network Interface (CNI)
 * Installing Metrics Server
 * Installing Metallb
