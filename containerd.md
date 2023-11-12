@@ -5,7 +5,7 @@ You need to run containerd (or any other container runtime) on all worker nodes.
 ## Install Containerd
 
 ```shell
-apt-get install -y containerd=1.7.2-0ubuntu1~22.04.1
+apt install -y containerd=1.7.2-0ubuntu1~22.04.1
 ```
 
 Install an explicit version to prevent any issue with configuration change on new updates.
@@ -17,7 +17,7 @@ we need to set it in containerd configuration.
 
 ```shell
 mkdir -p /etc/containerd/
-containerd config default | sudo tee /etc/containerd/config.toml
+containerd config default | tee /etc/containerd/config.toml
 ```
 
 Edit `/etc/containerd/config.toml` and set `SystemdCgroup = true`.

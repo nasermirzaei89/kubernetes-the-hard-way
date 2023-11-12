@@ -33,8 +33,8 @@ kubectl config use-context default --kubeconfig=kubernetes-admin.kubeconfig
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp kubernetes-admin.kubeconfig root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp kubernetes-admin.kubeconfig root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
@@ -71,8 +71,8 @@ kubectl config use-context default --kubeconfig=kube-controller-manager.kubeconf
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp kube-controller-manager.kubeconfig root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp kube-controller-manager.kubeconfig root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
@@ -109,8 +109,8 @@ kubectl config use-context default --kubeconfig=kube-scheduler.kubeconfig
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp kube-scheduler.kubeconfig root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp kube-scheduler.kubeconfig root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
@@ -119,6 +119,9 @@ done
 Create a template file for config:
 
 ```shell
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector load-balancer=true -o noheader -o columns=name); do
+  LOAD_BALANCER_INTERNAL_IP=$(hcloud server describe ${NODE_NAME} -o format='{{ (index .PrivateNet 0).IP}}')
+done
 cat <<EOF | tee kubernetes.conf
 [ req ]
 default_bits = 2048
@@ -140,7 +143,7 @@ DNS.3= kubernetes.default.svc
 DNS.4= kubernetes.default.svc.cluster
 DNS.5= kubernetes.default.svc.cluster.local
 IP.1 = 172.16.0.1
-IP.2 = 10.1.0.1
+IP.2 = ${LOAD_BALANCER_INTERNAL_IP}
 IP.3 = 127.0.0.1
 
 [ v3_ext ]
@@ -153,9 +156,7 @@ We use `172.16.0.0/12` for Service ip range. So the first one will be `kubernete
 ```shell
 openssl genrsa -out kubernetes.key 2048
 
-openssl req -new -key kubernetes.key \
-  -config kubernetes.conf \
-  -out kubernetes.csr
+openssl req -new -key kubernetes.key -config kubernetes.conf -out kubernetes.csr
 openssl x509 -req -in kubernetes.csr -CA kubernetes-ca.crt -CAkey kubernetes-ca.key \
   -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile kubernetes.conf \
   -out kubernetes.crt
@@ -163,11 +164,11 @@ openssl x509 -req -in kubernetes.csr -CA kubernetes-ca.crt -CAkey kubernetes-ca.
 
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
   scp \
   kubernetes-ca.crt kubernetes-ca.key \
   kubernetes.crt kubernetes.key \
-  root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+  root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
@@ -183,8 +184,8 @@ openssl x509 -req -in service-accounts.csr -CA kubernetes-ca.crt -CAkey kubernet
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp service-accounts.crt service-accounts.key root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp service-accounts.crt service-accounts.key root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
@@ -215,10 +216,34 @@ EOF
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp encryption-config.yaml root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp encryption-config.yaml root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
+
+
+### Create the Front-end Proxy Keys
+
+```shell
+openssl genrsa -out front-proxy-ca.key 2048
+openssl req -x509 -new -nodes -key front-proxy-ca.key -subj "/CN=kubernetes-front-proxy-ca" -days 5475 -out front-proxy-ca.crt
+```
+
+```shell
+openssl genrsa -out front-proxy-client.key 2048
+
+openssl req -new -key front-proxy-client.key -subj "/CN=front-proxy-client" -out front-proxy-client.csr
+openssl x509 -req -in front-proxy-client.csr -CA front-proxy-ca.crt -CAkey front-proxy-ca.key \
+  -sha256 -CAcreateserial -days 730 \
+  -out front-proxy-client.crt
+```
+
+```shell
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
+  scp front-proxy-client.crt front-proxy-client.key front-proxy-ca.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
+done
+```
+
 
 
 ## Install
@@ -236,7 +261,7 @@ Replace `<NODE_NAME>` with real node names.
 ### Download binaries
 
 ```shell
-sudo mkdir -p /etc/kubernetes/config
+mkdir -p /etc/kubernetes/config
 ```
 
 ```shell
@@ -250,13 +275,13 @@ wget -q --show-progress --https-only --timestamping \
 
 ```shell
 chmod +x kube-apiserver kube-controller-manager kube-scheduler kubectl
-sudo mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
+mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
 ```
 
 ```shell
-sudo mkdir -p /var/lib/kubernetes/
+mkdir -p /var/lib/kubernetes/
 
-sudo mv kubernetes-ca.crt kubernetes-ca.key \
+mv kubernetes-ca.crt kubernetes-ca.key \
   kubernetes.crt kubernetes.key \
   service-accounts.crt service-accounts.key \
   front-proxy-client.crt front-proxy-client.key front-proxy-ca.crt \
@@ -266,7 +291,7 @@ sudo mv kubernetes-ca.crt kubernetes-ca.key \
 ### Create `kube-apiserver` Service
 
 ```shell
-cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
+cat <<EOF | tee /etc/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes/kubernetes
@@ -309,11 +334,11 @@ EOF
 ### Create `kube-controller-manager` Service
 
 ```shell
-sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
+mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
 ```
 
 ```shell
-cat <<EOF | sudo tee /etc/systemd/system/kube-controller-manager.service
+cat <<EOF | tee /etc/systemd/system/kube-controller-manager.service
 [Unit]
 Description=Kubernetes Controller Manager
 Documentation=https://github.com/kubernetes/kubernetes
@@ -339,11 +364,11 @@ EOF
 ```
 
 ```shell
-sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
+mv kube-scheduler.kubeconfig /var/lib/kubernetes/
 ```
 
 ```shell
-cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
+cat <<EOF | tee /etc/kubernetes/config/kube-scheduler.yaml
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -352,7 +377,7 @@ EOF
 ```
 
 ```shell
-cat <<EOF | sudo tee /etc/systemd/system/kube-scheduler.service
+cat <<EOF | tee /etc/systemd/system/kube-scheduler.service
 [Unit]
 Description=Kubernetes Scheduler
 Documentation=https://github.com/kubernetes/kubernetes
@@ -376,27 +401,37 @@ systemctl enable kube-apiserver kube-controller-manager kube-scheduler
 systemctl start kube-apiserver kube-controller-manager kube-scheduler
 ```
 
-## RBAC for Kubelet Authorization
+## Connect kubectl
 
 ```shell
-cat <<EOF | kubectl apply -f -
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  annotations:
-    rbac.authorization.kubernetes.io/autoupdate: "true"
-  labels:
-    kubernetes.io/bootstrapping: rbac-defaults
-  name: system:kube-apiserver-to-kubelet
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - nodes/proxy
-    verbs:
-      - "*"
-EOF
+mkdir -p .kube
+mv kubernetes-admin.kubeconfig .kube/config
 ```
+
+## Enable Shell Autocompletion
+
+https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#enable-shell-autocompletion
+
+```shell
+echo 'source <(kubectl completion bash)' >>~/.bashrc
+```
+
+If you have an alias for kubectl, you can extend shell completion to work with that alias:
+
+```shell
+echo 'alias k=kubectl' >>~/.bashrc
+echo 'complete -o default -F __start_kubectl k' >>~/.bashrc
+```
+
+## RBAC for Kubelet Authorization
+
+Run:
+
+```shell
+kubectl get clusterrole system:kubelet-api-admin -o yaml
+```
+
+to make sure it exists. 
 
 ```shell
 cat <<EOF | kubectl apply -f -
@@ -404,7 +439,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: system:kube-apiserver
-  namespace: ""
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

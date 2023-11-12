@@ -11,9 +11,9 @@ but you can use any cloud provider or your own infrastructure.
 * [Bootstrapping the etcd Cluster](./etcd.md)
 * [Bootstrapping the Kubernetes Control Planes](./control-planes.md)
 * [Bootstrapping the Kubernetes Workers](./workers.md)
-* Installing Container Network Interface (CNI)
-* Installing Metrics Server
-* Installing Metallb
-* Installing NGINX Ingress Controller
+* [Installing Container Network Interface (CNI)](./cilium.md)
+* [Installing Metrics Server](./metrics-server.md)
+* [Installing Metallb](./metallb.md)
+* [Installing NGINX Ingress Controller](./nginx-ingress-controller.md)
 * Installing Rook CEPH
 * Test with Sonobuoy

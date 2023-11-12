@@ -1,11 +1,15 @@
-### Generate and Sign the Kubelet client certificate
+# Add Worker Nodes
+
+## Generate and Sign the Kubelet client certificate
 
 FOR EACH Worker:::
 
 Create a template file for config:
 
 ```shell
-cat <<EOF | tee ${NODE_NAME}-kubelet.conf
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
+  INTERNAL_IP=$(hcloud server describe ${NODE_NAME} -o format='{{ (index .PrivateNet 0).IP}}')
+  cat <<EOF | tee ${NODE_NAME}-kubelet.conf
 [ req ]
 default_bits = 2048
 prompt = no
@@ -27,50 +31,55 @@ IP.1 = ${INTERNAL_IP}
 [ v3_ext ]
 subjectAltName=@alt_names
 EOF
+done
 ```
 
 ```shell
-openssl genrsa -out ${NODE_NAME}-kubelet.key 2048
-
-openssl req -new -key ${NODE_NAME}-kubelet.key \
-  -config ${NODE_NAME}-kubelet.conf \
-  -out ${NODE_NAME}-kubelet.csr
-openssl x509 -req -in ${NODE_NAME}-kubelet.csr -CA kubernetes-ca.crt -CAkey kubernetes-ca.key \
-  -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE_NAME}-kubelet.conf \
-  -out ${NODE_NAME}-kubelet.crt
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
+  openssl genrsa -out ${NODE_NAME}-kubelet.key 2048
+  
+  openssl req -new -key ${NODE_NAME}-kubelet.key \
+    -config ${NODE_NAME}-kubelet.conf \
+    -out ${NODE_NAME}-kubelet.csr
+  openssl x509 -req -in ${NODE_NAME}-kubelet.csr -CA kubernetes-ca.crt -CAkey kubernetes-ca.key \
+    -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE_NAME}-kubelet.conf \
+    -out ${NODE_NAME}-kubelet.crt
+done
 ```
 
 ```shell
-kubectl config set-cluster ${CLUSTER_NAME} \
-  --certificate-authority=kubernetes-ca.crt \
-  --embed-certs=true \
-  --server=https://10.1.0.1:6443 \
-  --kubeconfig=ash2-node-wbf5dkrtt-kubelet.kubeconfig
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
+  kubectl config set-cluster ${CLUSTER_NAME} \
+    --certificate-authority=kubernetes-ca.crt \
+    --embed-certs=true \
+    --server=https://${LOAD_BALANCER_INTERNAL_IP}:6443 \
+    --kubeconfig=${NODE_NAME}-kubelet.kubeconfig
 
-kubectl config set-credentials system:node:ash2-node-wbf5dkrtt \
-  --client-certificate=ash2-node-wbf5dkrtt-kubelet.crt \
-  --client-key=ash2-node-wbf5dkrtt-kubelet.key \
-  --embed-certs=true \
-  --kubeconfig=ash2-node-wbf5dkrtt-kubelet.kubeconfig
+  kubectl config set-credentials system:node:${NODE_NAME} \
+    --client-certificate=${NODE_NAME}-kubelet.crt \
+    --client-key=${NODE_NAME}-kubelet.key \
+    --embed-certs=true \
+    --kubeconfig=${NODE_NAME}-kubelet.kubeconfig
 
-kubectl config set-context default \
-  --cluster=${CLUSTER_NAME} \
-  --user=system:node:ash2-node-wbf5dkrtt \
-  --kubeconfig=ash2-node-wbf5dkrtt-kubelet.kubeconfig
+  kubectl config set-context default \
+    --cluster=${CLUSTER_NAME} \
+    --user=system:node:${NODE_NAME} \
+    --kubeconfig=${NODE_NAME}-kubelet.kubeconfig
 
-kubectl config use-context default --kubeconfig=ash2-node-wbf5dkrtt-kubelet.kubeconfig
+  kubectl config use-context default --kubeconfig=${NODE_NAME}-kubelet.kubeconfig
+done
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
-  scp ${NODE}-kubelet.kubeconfig root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.kubeconfig
-  scp ${NODE}-kubelet.crt root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.crt
-  scp ${NODE}-kubelet.key root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.key
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
+  scp ${NODE_NAME}-kubelet.kubeconfig root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.kubeconfig
+  scp ${NODE_NAME}-kubelet.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.crt
+  scp ${NODE_NAME}-kubelet.key root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/kubelet.key
 done
 ```
 
 
-### Generate and Sign the Kube Proxy client certificate
+## Generate and Sign the Kube Proxy client certificate
 
 ```shell
 openssl genrsa -out kube-proxy.key 2048
@@ -85,7 +94,7 @@ openssl x509 -req -in kube-proxy.csr -CA kubernetes-ca.crt -CAkey kubernetes-ca.
 kubectl config set-cluster ${CLUSTER_NAME} \
   --certificate-authority=kubernetes-ca.crt \
   --embed-certs=true \
-  --server=https://10.1.0.1:6443 \
+  --server=https://${LOAD_BALANCER_INTERNAL_IP}:6443 \
   --kubeconfig=kube-proxy.kubeconfig
 
 kubectl config set-credentials system:kube-proxy \
@@ -103,16 +112,30 @@ kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
 ```
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
-  scp kube-proxy.kubeconfig kubernetes-ca.crt root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector worker=true -o noheader -o columns=name); do
+  scp kube-proxy.kubeconfig kubernetes-ca.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
 
-ON EACH WORKER:
+## SSH to Node
+
+On all worker nodes:
 
 ```shell
-sudo swapoff -a
+ssh root@$(hcloud server describe <NODE_NAME> -o format='{{.PublicNet.IPv4.IP}}')
 ```
+
+## Turn off SWAP
+
+```shell
+swapoff -a
+```
+
+## Install Containerd
+
+[Install Containerd](./containerd.md)
+
+## Download binaries
 
 ```shell
 KUBERNETES_VERSION=v1.28.3
@@ -135,7 +158,7 @@ mv kubernetes-ca.crt /var/lib/kubernetes/
 
 
 ```shell
-cat <<EOF | sudo tee /var/lib/kubelet/kubelet-config.yaml
+cat <<EOF | tee /var/lib/kubelet/kubelet-config.yaml
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 authentication:
@@ -160,7 +183,7 @@ EOF
 ```
 
 ```shell
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
+cat <<EOF | tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet
 Documentation=https://github.com/kubernetes/kubernetes
@@ -170,7 +193,7 @@ Requires=containerd.service
 [Service]
 ExecStart=/usr/local/bin/kubelet \\
   --config=/var/lib/kubelet/kubelet-config.yaml \\
-  --node-ip=10.1.0.1 \\
+  --node-ip=${INTERNAL_IP} \\
   --kubeconfig=/var/lib/kubelet/kubeconfig
 Restart=on-failure
 RestartSec=5
@@ -186,7 +209,7 @@ mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
 ```
 
 ```shell
-cat <<EOF | sudo tee /var/lib/kube-proxy/kube-proxy-config.yaml
+cat <<EOF | tee /var/lib/kube-proxy/kube-proxy-config.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
@@ -200,11 +223,11 @@ EOF
 if you use mode "ipvs", you need to install `ipset` and `conntrack`:
 
 ```shell
-apt install ipset conntrack
+apt install -y ipset conntrack
 ```
 
 ```shell
-cat <<EOF | sudo tee /etc/systemd/system/kube-proxy.service
+cat <<EOF | tee /etc/systemd/system/kube-proxy.service
 [Unit]
 Description=Kubernetes Kube Proxy
 Documentation=https://github.com/kubernetes/kubernetes
@@ -225,3 +248,14 @@ systemctl daemon-reload
 systemctl enable kubelet kube-proxy
 systemctl start kubelet kube-proxy
 ```
+
+## Verify
+
+Run:
+
+```shell
+kubectl get nodes
+```
+
+Now you see nodes are not ready.
+To make them ready you need a CNI.

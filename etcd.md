@@ -30,58 +30,59 @@ subjectAltName=@alt_names
 EOF
 ```
 
-We need 2 certificates for each etcd node. Server certificate for authenticating client requests, and Peer certificate to communicate with other nodes.
+We need 2 certificates for each etcd node.
+Server certificate for authenticating client requests, and Peer certificate to communicate with other nodes.
 
 Although it’s not mandatory, using separate certificates for different purposes adds an extra layer of security and minimizes the risk of compromise in a distributed system like etcd.
 
 For each member (Server Cert):
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
-  openssl genrsa -out ${NODE}-etcd-server.key 2048
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
+  openssl genrsa -out ${NODE_NAME}-etcd-server.key 2048
 
-  INTERNAL_IP=$(hcloud server describe ${NODE} -o format='{{ (index .PrivateNet 0).IP}}')
+  INTERNAL_IP=$(hcloud server describe ${NODE_NAME} -o format='{{ (index .PrivateNet 0).IP}}')
 
-  cat etcd-server.conf.tpl | sed -e "s/\<NODE_NAME>/${NODE}/" -e "s/\<NODE_INTERNAL_IP>/${INTERNAL_IP}/" > ${NODE}-etcd-server.conf 
+  cat etcd-server.conf.tpl | sed -e "s/\<NODE_NAME>/${NODE_NAME}/" -e "s/\<NODE_INTERNAL_IP>/${INTERNAL_IP}/" > ${NODE_NAME}-etcd-server.conf 
 
-  openssl req -new -key ${NODE}-etcd-server.key \
-    -config ${NODE}-etcd-server.conf \
-    -out ${NODE}-etcd-server.csr
-  openssl x509 -req -in ${NODE}-etcd-server.csr -CA etcd-ca.crt -CAkey etcd-ca.key \
-    -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE}-etcd-server.conf \
-    -out ${NODE}-etcd-server.crt
+  openssl req -new -key ${NODE_NAME}-etcd-server.key \
+    -config ${NODE_NAME}-etcd-server.conf \
+    -out ${NODE_NAME}-etcd-server.csr
+  openssl x509 -req -in ${NODE_NAME}-etcd-server.csr -CA etcd-ca.crt -CAkey etcd-ca.key \
+    -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE_NAME}-etcd-server.conf \
+    -out ${NODE_NAME}-etcd-server.crt
 done
 ```
 
 For each member (Peer Cert):
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
-  openssl genrsa -out ${NODE}-etcd-peer.key 2048
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
+  openssl genrsa -out ${NODE_NAME}-etcd-peer.key 2048
 
-  EXTERNAL_IP=$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}')
-  INTERNAL_IP=$(hcloud server describe ${NODE} -o format='{{ (index .PrivateNet 0).IP}}')
+  EXTERNAL_IP=$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}')
+  INTERNAL_IP=$(hcloud server describe ${NODE_NAME} -o format='{{ (index .PrivateNet 0).IP}}')
 
-  cat etcd-server.conf.tpl | sed -e "s/\<NODE_NAME>/${NODE}/" -e "s/\<NODE_INTERNAL_IP>/${INTERNAL_IP}/" -e "s/\<NODE_EXTERNAL_IP>/${EXTERNAL_IP}/" > ${NODE}-etcd-peer.conf 
+  cat etcd-server.conf.tpl | sed -e "s/\<NODE_NAME>/${NODE_NAME}/" -e "s/\<NODE_INTERNAL_IP>/${INTERNAL_IP}/" -e "s/\<NODE_EXTERNAL_IP>/${EXTERNAL_IP}/" > ${NODE_NAME}-etcd-peer.conf 
 
-  openssl req -new -key ${NODE}-etcd-peer.key \
-    -config ${NODE}-etcd-peer.conf \
-    -out ${NODE}-etcd-peer.csr
-  openssl x509 -req -in ${NODE}-etcd-peer.csr -CA etcd-ca.crt -CAkey etcd-ca.key \
-    -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE}-etcd-peer.conf \
-    -out ${NODE}-etcd-peer.crt
+  openssl req -new -key ${NODE_NAME}-etcd-peer.key \
+    -config ${NODE_NAME}-etcd-peer.conf \
+    -out ${NODE_NAME}-etcd-peer.csr
+  openssl x509 -req -in ${NODE_NAME}-etcd-peer.csr -CA etcd-ca.crt -CAkey etcd-ca.key \
+    -sha256 -CAcreateserial -days 730 -extensions v3_ext -extfile ${NODE_NAME}-etcd-peer.conf \
+    -out ${NODE_NAME}-etcd-peer.crt
 done
 ```
 
 Copy Certificates to servers
 
 ```shell
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
-  scp etcd-ca.crt root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/
-  scp ${NODE}-etcd-server.key root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-server.key
-  scp ${NODE}-etcd-server.crt root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-server.crt
-  scp ${NODE}-etcd-peer.key root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-peer.key
-  scp ${NODE}-etcd-peer.crt root@$(hcloud server describe ${NODE} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-peer.crt
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
+  scp etcd-ca.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
+  scp ${NODE_NAME}-etcd-server.key root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-server.key
+  scp ${NODE_NAME}-etcd-server.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-server.crt
+  scp ${NODE_NAME}-etcd-peer.key root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-peer.key
+  scp ${NODE_NAME}-etcd-peer.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/etcd-peer.crt
 done
 ```
 
@@ -104,7 +105,8 @@ apt update
 apt install -y etcd
 ```
 
-In this article etcd 3.5.10 is released. Future releases may have a different configuration.
+In this article etcd 3.3.25 is released.
+Future releases may have a different configuration.
 
 ### Configure
 
@@ -133,8 +135,8 @@ I wrote this script to provide value of `ETCD_INITIAL_CLUSTER` variable:
 
 ```shell
 ARRAY=()
-for NODE in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
-  ARRAY+=("${NODE}=https://$(hcloud server describe ${NODE} -o format='{{ (index .PrivateNet 0).IP}}'):2380")
+for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector etcd=true -o noheader -o columns=name); do
+  ARRAY+=("${NODE_NAME}=https://$(hcloud server describe ${NODE_NAME} -o format='{{ (index .PrivateNet 0).IP}}'):2380")
 done
 
 ETCD_INITIAL_CLUSTER=$(printf ",%s" "${ARRAY[@]}")

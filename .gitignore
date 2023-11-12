@@ -5,3 +5,8 @@
 *.conf
 *.csr
 *.srl
+
+*.kubeconfig
+*.tpl
+
+encryption-config.yaml
