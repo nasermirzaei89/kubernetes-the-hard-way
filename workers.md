@@ -151,6 +151,7 @@ mv kube-proxy kubelet /usr/local/bin/
 
 ```shell
 mkdir -p /var/lib/kubelet/
+mkdir -p /var/lib/kubernetes/
 mv kubelet.key kubelet.crt /var/lib/kubelet/
 mv kubelet.kubeconfig /var/lib/kubelet/kubeconfig
 mv kubernetes-ca.crt /var/lib/kubernetes/

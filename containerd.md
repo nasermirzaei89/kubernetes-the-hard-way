@@ -5,6 +5,7 @@ You need to run containerd (or any other container runtime) on all worker nodes.
 ## Install Containerd
 
 ```shell
+apt update
 apt install -y containerd=1.7.2-0ubuntu1~22.04.1
 ```
 

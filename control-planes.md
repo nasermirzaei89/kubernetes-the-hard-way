@@ -428,7 +428,27 @@ echo 'complete -o default -F __start_kubectl k' >>~/.bashrc
 Run:
 
 ```shell
-kubectl get clusterrole system:kubelet-api-admin -o yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
+EOF
 ```
 
 to make sure it exists. 
@@ -442,7 +462,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:kubelet-api-admin
+  name: system:kube-apiserver-to-kubelet
 subjects:
   - apiGroup: rbac.authorization.k8s.io
     kind: User
