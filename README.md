@@ -15,5 +15,5 @@ but you can use any cloud provider or your own infrastructure.
 * [Installing Metrics Server](./metrics-server.md)
 * [Installing Metallb](./metallb.md)
 * [Installing NGINX Ingress Controller](./nginx-ingress-controller.md)
-* Installing Rook CEPH
+* [Installing Rook CEPH](./rook-ceph.md)
 * Test with Sonobuoy

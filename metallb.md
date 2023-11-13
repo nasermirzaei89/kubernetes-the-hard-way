@@ -37,6 +37,12 @@ kubectl apply -f https://raw.githubusercontent.com/cbeneke/hcloud-fip-controller
 kubectl apply -f https://raw.githubusercontent.com/cbeneke/hcloud-fip-controller/v0.4.1/deploy/deployment.yaml
 ```
 
+You can scale it down, if you want:
+
+```shell
+kubectl scale --namespace fip-controller --replicas=1 deployment/fip-controller
+```
+
 ## Install Metallb
 
 ```shell

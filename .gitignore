@@ -10,3 +10,4 @@
 *.tpl
 
 encryption-config.yaml
+rook-ceph-cluster-overrides.yaml
