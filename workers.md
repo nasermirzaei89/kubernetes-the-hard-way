@@ -184,6 +184,7 @@ EOF
 ```
 
 ```shell
+INTERNAL_IP=???
 cat <<EOF | tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet

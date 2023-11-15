@@ -225,26 +225,19 @@ done
 ### Create the Front-end Proxy Keys
 
 ```shell
-openssl genrsa -out front-proxy-ca.key 2048
-openssl req -x509 -new -nodes -key front-proxy-ca.key -subj "/CN=kubernetes-front-proxy-ca" -days 5475 -out front-proxy-ca.crt
-```
-
-```shell
 openssl genrsa -out front-proxy-client.key 2048
 
 openssl req -new -key front-proxy-client.key -subj "/CN=front-proxy-client" -out front-proxy-client.csr
-openssl x509 -req -in front-proxy-client.csr -CA front-proxy-ca.crt -CAkey front-proxy-ca.key \
+openssl x509 -req -in front-proxy-client.csr -CA kubernetes-front-proxy-ca.crt -CAkey kubernetes-front-proxy-ca.key \
   -sha256 -CAcreateserial -days 730 \
   -out front-proxy-client.crt
 ```
 
 ```shell
 for NODE_NAME in $(hcloud server list --selector cluster=${CLUSTER_NAME} --selector control-plane=true -o noheader -o columns=name); do
-  scp front-proxy-client.crt front-proxy-client.key front-proxy-ca.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
+  scp front-proxy-client.crt front-proxy-client.key kubernetes-front-proxy-ca.crt root@$(hcloud server describe ${NODE_NAME} -o format='{{.PublicNet.IPv4.IP}}'):~/
 done
 ```
-
-
 
 ## Install
 
@@ -284,13 +277,14 @@ mkdir -p /var/lib/kubernetes/
 mv kubernetes-ca.crt kubernetes-ca.key \
   kubernetes.crt kubernetes.key \
   service-accounts.crt service-accounts.key \
-  front-proxy-client.crt front-proxy-client.key front-proxy-ca.crt \
+  front-proxy-client.crt front-proxy-client.key kubernetes-front-proxy-ca.crt \
   encryption-config.yaml /var/lib/kubernetes/
 ```
 
 ### Create `kube-apiserver` Service
 
 ```shell
+INTERNAL_IP=???
 cat <<EOF | tee /etc/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
@@ -316,10 +310,11 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --service-cluster-ip-range=172.16.0.0/12 \\
   --tls-cert-file=/var/lib/kubernetes/kubernetes.crt \\
   --tls-private-key-file=/var/lib/kubernetes/kubernetes.key \\
+  --kubelet-preferred-address-types=InternalIP,Hostname \\
   --proxy-client-cert-file=/var/lib/kubernetes/front-proxy-client.crt \\
   --proxy-client-key-file=/var/lib/kubernetes/front-proxy-client.key \\
   --requestheader-allowed-names=front-proxy-client \\
-  --requestheader-client-ca-file=/var/lib/kubernetes/front-proxy-ca.crt \\
+  --requestheader-client-ca-file=/var/lib/kubernetes/kubernetes-front-proxy-ca.crt \\
   --requestheader-extra-headers-prefix=X-Remote-Extra- \\
   --requestheader-group-headers=X-Remote-Group \\
   --requestheader-username-headers=X-Remote-User

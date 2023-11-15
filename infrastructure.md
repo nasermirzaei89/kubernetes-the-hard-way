@@ -74,6 +74,7 @@ hcloud server create \
   --label control-plane=true \
   --label worker=true \
   --label load-balancer=true \
+  --without-ipv6 \
   --location ash
 ```
 
