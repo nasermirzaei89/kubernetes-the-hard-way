@@ -13,6 +13,8 @@ Install an explicit version to prevent any issue with configuration change on ne
 
 ## Configure the `systemd` cgroup driver
 
+https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd-systemd
+
 To use the `systemd` cgroup driver in `/etc/containerd/config.toml` with `runc`,
 we need to set it in containerd configuration.
 

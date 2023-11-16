@@ -138,7 +138,7 @@ swapoff -a
 ## Download binaries
 
 ```shell
-KUBERNETES_VERSION=v1.28.3
+KUBERNETES_VERSION=v1.28.4
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kube-proxy \
   https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubelet
@@ -157,6 +157,7 @@ mv kubelet.kubeconfig /var/lib/kubelet/kubeconfig
 mv kubernetes-ca.crt /var/lib/kubernetes/
 ```
 
+https://kubernetes.io/docs/setup/production-environment/container-runtimes/#systemd-cgroup-driver
 
 ```shell
 cat <<EOF | tee /var/lib/kubelet/kubelet-config.yaml
@@ -182,6 +183,8 @@ tlsCertFile: "/var/lib/kubelet/kubelet.crt"
 tlsPrivateKeyFile: "/var/lib/kubelet/kubelet.key"
 EOF
 ```
+
+Later we use `172.16.0.10` as coredns service cluster ip.
 
 ```shell
 INTERNAL_IP=???

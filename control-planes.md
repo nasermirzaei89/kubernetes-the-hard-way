@@ -258,7 +258,7 @@ mkdir -p /etc/kubernetes/config
 ```
 
 ```shell
-KUBERNETES_VERSION=v1.28.3
+KUBERNETES_VERSION=v1.28.4
 wget -q --show-progress --https-only --timestamping \
   "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kube-apiserver" \
   "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kube-controller-manager" \
@@ -310,7 +310,7 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --service-cluster-ip-range=172.16.0.0/12 \\
   --tls-cert-file=/var/lib/kubernetes/kubernetes.crt \\
   --tls-private-key-file=/var/lib/kubernetes/kubernetes.key \\
-  --kubelet-preferred-address-types=InternalIP,Hostname \\
+  --kubelet-preferred-address-types=InternalIP,InternalDNS,Hostname \\
   --proxy-client-cert-file=/var/lib/kubernetes/front-proxy-client.crt \\
   --proxy-client-key-file=/var/lib/kubernetes/front-proxy-client.key \\
   --requestheader-allowed-names=front-proxy-client \\
